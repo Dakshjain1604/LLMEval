@@ -1,0 +1,177 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llmeval
+
+---
+# Secret - Replace with your actual values before deploying
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llmeval-secrets
+  namespace: llmeval
+type: Opaque
+stringData:
+  DISCORD_WEBHOOK_URL: "YOUR_DISCORD_WEBHOOK_URL"
+  OPENROUTER_API_KEY: "YOUR_OPENROUTER_API_KEY"
+  HUGGINGFACE_TOKEN: ""  # Optional
+  GITHUB_TOKEN: ""       # Optional
+  KAGGLE_USERNAME: ""    # Optional
+  KAGGLE_KEY: ""         # Optional
+
+---
+# Persistent Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llmeval-data
+  namespace: llmeval
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# CronJob - Runs every 12 hours
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: llmeval-monitor
+  namespace: llmeval
+spec:
+  schedule: "0 9,21 * * *"  # 9 AM and 9 PM UTC
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: llmeval
+            image: YOUR_REGISTRY/llmeval:latest  # UPDATE THIS
+            imagePullPolicy: Always
+            envFrom:
+            - secretRef:
+                name: llmeval-secrets
+            volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: data
+              mountPath: /app/data
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "2Gi"
+                cpu: "1000m"
+          volumes:
+          - name: config
+            configMap:
+              name: llmeval-config
+          - name: data
+            persistentVolumeClaim:
+              claimName: llmeval-data
+
+---
+# ConfigMap - Application Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llmeval-config
+  namespace: llmeval
+data:
+  config.yaml: |
+    schedule:
+      cron: "0 9,21 * * *"
+
+    discord:
+      webhook_url: ""  # From environment
+      dry_run: false
+
+    llm:
+      provider: "openrouter"
+      api_key: ""  # From environment
+      model: "deepseek/deepseek-chat"
+      temperature: 0.3
+
+    platforms:
+      huggingface:
+        enabled: true
+        check_models: true
+        check_datasets: true
+        min_downloads: 100
+        priority_tags:
+          - "text-generation"
+          - "image-generation"
+          - "multimodal"
+
+      arxiv:
+        enabled: true
+        categories: ["cs.AI", "cs.LG", "cs.CL"]
+        keywords: ["language model", "transformer", "benchmark", "multimodal"]
+
+      kaggle:
+        enabled: true
+        check_datasets: true
+        check_models: true
+        min_votes: 5
+
+      github:
+        enabled: true
+        topics: ["machine-learning", "deep-learning", "llm", "transformer"]
+        min_stars: 50
+
+    neo_context:
+      description: |
+        NEO is an autonomous AI/ML evaluation agent that tests and evaluates
+        the latest AI/ML models across all modalities.
+      capabilities:
+        - "Evaluate language, image, audio, video, and multimodal models"
+        - "Run comprehensive benchmarks"
+      limitations:
+        - "Limited to publicly available models"
+
+    filtering:
+      min_relevance_score: 60
+      max_items_per_run: 15
+      scoring:
+        dimension_weights:
+          relevance: 0.30
+          quality: 0.20
+          novelty: 0.25
+          evaluability: 0.20
+          impact: 0.05
+        min_confidence: 0.5
+      thresholds:
+        default: 60
+        platform_specific:
+          huggingface: 65
+          github: 55
+          arxiv: 70
+          kaggle: 60
+        adaptive:
+          enabled: true
+          min_threshold: 50
+          max_threshold: 75
+      selection:
+        use_diversity_constraints: true
+        diversity_constraints:
+          max_per_platform: 7
+          max_per_modality: 8
+          min_platforms: 2
+          max_similar_tasks: 4
+      exclude_keywords: ["private", "deprecated", "archived"]
+      priority_keywords: ["sota", "benchmark", "latest", "2025", "2026"]
+
+    storage:
+      database: "data/releases.db"
+      retention_days: 30
