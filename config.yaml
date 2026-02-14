@@ -1,0 +1,276 @@
+# AI/ML Release Monitor Configuration
+
+# Cronjob schedule (cron format)
+schedule:
+  # Run every 12 hours at 9 AM and 9 PM
+  cron: "0 9,21 * * *"
+
+# Discord webhook configuration
+discord:
+  webhook_url: "YOUR_DISCORD_WEBHOOK_URL_HERE"
+  # Set to true for testing without sending to Discord
+  dry_run: false
+
+# LLM API Configuration (for filtering)
+llm:
+  # Options: "anthropic", "openai", "openrouter"
+  provider: "openrouter"
+  api_key: "YOUR_API_KEY_HERE"
+  # Model to use for filtering
+  # OpenAI: "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"
+  # Anthropic: "claude-sonnet-4-5-20250929", "claude-opus-4-6", "claude-haiku-4-5-20251001"
+  # OpenRouter: "anthropic/claude-3.5-sonnet", "google/gemini-pro-1.5", "meta-llama/llama-3.1-70b-instruct", "deepseek/deepseek-chat"
+  model: "deepseek/deepseek-chat"
+  # Temperature for filtering decisions
+  temperature: 0.3
+
+# Platform configurations
+platforms:
+  huggingface:
+    enabled: true
+    # Check models, datasets, and spaces
+    check_models: true
+    check_datasets: true
+    # Only include models with minimum downloads
+    min_downloads: 100
+    # Tags to prioritize (empty = all)
+    priority_tags:
+      # Language models
+      - "text-generation"
+      - "text-classification"
+      - "question-answering"
+      - "conversational"
+      # Image models
+      - "image-classification"
+      - "object-detection"
+      - "image-to-text"
+      - "text-to-image"
+      - "image-generation"
+      - "image-segmentation"
+      # Audio/Voice models
+      - "automatic-speech-recognition"
+      - "text-to-speech"
+      - "audio-classification"
+      - "audio-to-audio"
+      - "text-to-audio"
+      - "audio-generation"
+      # Video models
+      - "video-classification"
+      - "text-to-video"
+      - "video-generation"
+      # Multimodal
+      - "multimodal"
+      - "visual-question-answering"
+      - "document-question-answering"
+      # Code & RL
+      - "reinforcement-learning"
+      - "robotics"
+      # Other
+      - "feature-extraction"
+      - "sentence-similarity"
+      - "zero-shot-classification"
+
+  arxiv:
+    enabled: true
+    # Categories to monitor
+    categories:
+      - "cs.AI"  # Artificial Intelligence
+      - "cs.LG"  # Machine Learning
+      - "cs.CL"  # Computation and Language
+      - "stat.ML"  # Machine Learning (Stats)
+    # Keywords to prioritize
+    keywords:
+      - "language model"
+      - "transformer"
+      - "benchmark"
+      - "evaluation"
+      - "dataset"
+      - "diffusion"
+      - "image generation"
+      - "multimodal"
+      - "vision-language"
+      - "large language model"
+      - "llm"
+      - "speech recognition"
+      - "text-to-speech"
+      - "audio"
+      - "video generation"
+      - "reinforcement learning"
+      - "code generation"
+      - "embedding"
+
+  kaggle:
+    enabled: true
+    # Kaggle username (optional, for API access)
+    username: ""
+    api_key: ""
+    # Check datasets and models
+    check_datasets: true
+    check_models: true
+    # Minimum votes to consider
+    min_votes: 5
+
+  github:
+    enabled: true
+    # GitHub token for higher API rate limits
+    token: ""
+    # Topics to monitor
+    topics:
+      - "machine-learning"
+      - "deep-learning"
+      - "llm"
+      - "transformer"
+      - "diffusion"
+      - "image-generation"
+      - "multimodal"
+      - "vision-language-model"
+      - "computer-vision"
+      - "speech-recognition"
+      - "text-to-speech"
+      - "audio-generation"
+      - "video-generation"
+      - "reinforcement-learning"
+      - "code-generation"
+      - "embedding"
+      - "music-generation"
+      - "voice-cloning"
+    # Minimum stars for new repos
+    min_stars: 50
+
+# NEO Agent context - used by LLM for filtering
+neo_context:
+  description: |
+    NEO is an autonomous AI/ML evaluation agent that tests and evaluates the latest AI/ML models
+    across all modalities. NEO's mission is to discover cutting-edge releases, evaluate them
+    comprehensively, and post findings to help the community understand model capabilities.
+
+  capabilities:
+    - "Full access to HuggingFace (models, datasets, spaces)"
+    - "Full access to Kaggle (datasets, competitions, models)"
+    - "Full access to GitHub (repos, models, code)"
+    - "Full access to Weights & Biases for experiment tracking"
+    - "Full access to AWS S3 for data storage and retrieval"
+    - "Can evaluate language models (LLMs, chat models, instruction models, code generation)"
+    - "Can evaluate image models (generation, classification, detection, segmentation, diffusion)"
+    - "Can evaluate audio/voice models (speech recognition, TTS, audio generation, music generation)"
+    - "Can evaluate video models (video generation, video classification, video understanding)"
+    - "Can evaluate multimodal models (vision-language, audio-visual, any combination)"
+    - "Can evaluate RL/robotics models, embeddings, and specialized architectures"
+    - "Can run comprehensive benchmarks and evaluation tests across all modalities"
+    - "Can work with all ML frameworks (PyTorch, TensorFlow, JAX, HuggingFace, etc.)"
+    - "Particularly interested in LATEST and NOVEL model releases across ALL AI/ML domains"
+
+  limitations:
+    - "Limited to publicly available models/datasets (no proprietary closed-source models)"
+    - "Must have clear evaluation criteria or benchmarks"
+    - "Prefers models with documentation and usage examples"
+
+# Filtering criteria
+filtering:
+  # Minimum relevance score (0-100) from LLM
+  min_relevance_score: 60
+  # Maximum items to send per run
+  max_items_per_run: 15
+
+  # Multi-dimensional scoring configuration
+  scoring:
+    # Dimension weights (must sum to 1.0)
+    dimension_weights:
+      relevance: 0.30      # Match to NEO's capabilities
+      quality: 0.20        # Code quality, documentation
+      novelty: 0.25        # Cutting-edge, unique
+      evaluability: 0.20   # How easily NEO can test
+      impact: 0.05         # Expected community value
+    # Minimum confidence for scoring
+    min_confidence: 0.5
+
+  # Adaptive thresholds
+  thresholds:
+    default: 60
+    platform_specific:
+      huggingface: 65    # High volume, raise bar
+      github: 55         # Lower volume, lower bar
+      arxiv: 70          # Research papers need high relevance
+      kaggle: 60         # Standard threshold
+    adaptive:
+      enabled: true
+      min_threshold: 50
+      max_threshold: 75
+
+  # Diversity selection
+  selection:
+    use_diversity_constraints: true
+    diversity_constraints:
+      max_per_platform: 7
+      max_per_modality: 8
+      min_platforms: 2
+      max_similar_tasks: 4
+    use_priority_queue: false  # Will be enabled in Phase 3.2
+
+  # Exclude items with these keywords
+  exclude_keywords:
+    - "private"
+    - "deprecated"
+    - "archived"
+  # Prioritize items with these keywords
+  priority_keywords:
+    - "sota"
+    - "state-of-the-art"
+    - "benchmark"
+    - "evaluation"
+    - "open-source"
+    # Language models
+    - "language model"
+    - "llm"
+    - "gpt"
+    - "llama"
+    - "mistral"
+    - "gemma"
+    - "qwen"
+    - "phi"
+    # Image models
+    - "image generation"
+    - "diffusion"
+    - "stable diffusion"
+    - "flux"
+    - "dall-e"
+    - "midjourney"
+    # Audio/Voice models
+    - "whisper"
+    - "speech"
+    - "audio"
+    - "text-to-speech"
+    - "tts"
+    - "voice"
+    - "music generation"
+    - "audio generation"
+    # Video models
+    - "video generation"
+    - "sora"
+    - "video"
+    # Multimodal
+    - "multimodal"
+    - "vision-language"
+    - "vlm"
+    # Code models
+    - "code generation"
+    - "codex"
+    - "copilot"
+    # Other
+    - "reinforcement learning"
+    - "rl"
+    - "embedding"
+    - "novel"
+    - "new architecture"
+    - "breakthrough"
+    - "latest"
+    - "2024"
+    - "2025"
+    - "2026"
+
+# Storage
+storage:
+  # SQLite database for tracking seen items
+  database: "data/releases.db"
+  # Days to keep history
+  retention_days: 30

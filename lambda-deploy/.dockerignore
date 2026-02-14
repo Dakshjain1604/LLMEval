@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Data files (not needed in Lambda)
+data/
+*.db
+*.log
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+tests/
+*.test
+.pytest_cache/
+
+# Deployment
+deploy/
+lambda-deploy/
+.aws-sam/
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Reports
+reports/

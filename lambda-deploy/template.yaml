@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: LlmEval - AI/ML Release Monitor on AWS Lambda
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: llmeval-monitor
+    Description: Autonomous AI/ML release monitoring with multi-dimensional scoring
+    Author: LlmEval
+    SpdxLicenseId: MIT
+    ReadmeUrl: README.md
+    SemanticVersion: 2.0.0
+
+Globals:
+  Function:
+    Timeout: 900  # 15 minutes (maximum for Lambda)
+    MemorySize: 2048  # 2GB RAM (adjust as needed)
+    Environment:
+      Variables:
+        DISCORD_WEBHOOK_URL: !Ref DiscordWebhookUrl
+        OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+        S3_BUCKET_NAME: !Ref DatabaseBucket
+        HUGGINGFACE_TOKEN: !Ref HuggingFaceToken
+        KAGGLE_USERNAME: !Ref KaggleUsername
+        KAGGLE_KEY: !Ref KaggleKey
+        GITHUB_TOKEN: !Ref GithubToken
+
+Parameters:
+  DiscordWebhookUrl:
+    Type: String
+    Description: Discord webhook URL for notifications
+    NoEcho: false
+
+  OpenRouterApiKey:
+    Type: String
+    Description: OpenRouter API key for LLM access
+    NoEcho: true
+
+  HuggingFaceToken:
+    Type: String
+    Description: HuggingFace token (optional)
+    Default: ""
+    NoEcho: true
+
+  KaggleUsername:
+    Type: String
+    Description: Kaggle username (optional)
+    Default: ""
+
+  KaggleKey:
+    Type: String
+    Description: Kaggle API key (optional)
+    Default: ""
+    NoEcho: true
+
+  GithubToken:
+    Type: String
+    Description: GitHub token (optional)
+    Default: ""
+    NoEcho: true
+
+  Schedule1:
+    Type: String
+    Description: First schedule (cron expression in UTC)
+    Default: "cron(0 9 * * ? *)"  # 9 AM UTC
+
+  Schedule2:
+    Type: String
+    Description: Second schedule (cron expression in UTC)
+    Default: "cron(0 21 * * ? *)"  # 9 PM UTC
+
+Resources:
+  # S3 Bucket for database storage
+  DatabaseBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "llmeval-database-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            Prefix: backups/
+            ExpirationInDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Lambda Function
+  LlmEvalFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: llmeval-monitor
+      Description: AI/ML Release Monitor with multi-dimensional scoring
+      PackageType: Image
+      ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/llmeval:latest
+      Architectures:
+        - x86_64
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref DatabaseBucket
+        - CloudWatchLogsFullAccess
+      Events:
+        MorningSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref Schedule1
+            Name: llmeval-morning-schedule
+            Description: Run LlmEval in the morning (9 AM UTC)
+            Enabled: true
+        EveningSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref Schedule2
+            Name: llmeval-evening-schedule
+            Description: Run LlmEval in the evening (9 PM UTC)
+            Enabled: true
+
+  # CloudWatch Log Group with retention
+  LlmEvalLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LlmEvalFunction}
+      RetentionInDays: 14
+
+  # CloudWatch Alarm for function errors
+  FunctionErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: llmeval-function-errors
+      AlarmDescription: Alert when LlmEval Lambda function fails
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LlmEvalFunction
+      TreatMissingData: notBreaching
+
+  # CloudWatch Alarm for function duration (approaching timeout)
+  FunctionDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: llmeval-function-duration
+      AlarmDescription: Alert when LlmEval Lambda is taking too long
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Maximum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 840000  # 14 minutes (approaching 15 min timeout)
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LlmEvalFunction
+      TreatMissingData: notBreaching
+
+Outputs:
+  LlmEvalFunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt LlmEvalFunction.Arn
+    Export:
+      Name: llmeval-function-arn
+
+  DatabaseBucketName:
+    Description: S3 Bucket for database storage
+    Value: !Ref DatabaseBucket
+    Export:
+      Name: llmeval-database-bucket
+
+  MorningScheduleRule:
+    Description: Morning schedule rule (9 AM UTC)
+    Value: !Ref Schedule1
+
+  EveningScheduleRule:
+    Description: Evening schedule rule (9 PM UTC)
+    Value: !Ref Schedule2
+
+  LogGroup:
+    Description: CloudWatch Log Group
+    Value: !Ref LlmEvalLogGroup
+
+  InvocationCommand:
+    Description: AWS CLI command to invoke the function manually
+    Value: !Sub |
+      aws lambda invoke \
+        --function-name ${LlmEvalFunction} \
+        --payload '{}' \
+        --region ${AWS::Region} \
+        response.json
